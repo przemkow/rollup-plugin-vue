@@ -202,8 +202,7 @@ export default function vue(opts: Partial<VuePluginOptions> = {}): Plugin {
   if (!opts.styleInjectorShadow)
     opts.styleInjectorShadow =
       '~' + 'vue-runtime-helpers/dist/inject-style/shadow.mjs'
-  if (opts.shadowMode)
-    opts.isWebComponent = true
+  if (opts.shadowMode) opts.isWebComponent = true
 
   createVuePartRequest.defaultLang = {
     ...createVuePartRequest.defaultLang,
@@ -266,7 +265,7 @@ export default function vue(opts: Partial<VuePluginOptions> = {}): Plugin {
   if (opts.css === false) d('Running in CSS extract mode')
 
   const getCompiler = ({ scopeId }: { scopeId?: string }) => {
-    const options: VueCompilerOptions = { ...opts }
+    const options: VueCompilerOptions = { ...opts } as any
 
     options.template = {
       ...options.template!,
@@ -353,7 +352,7 @@ export default function vue(opts: Partial<VuePluginOptions> = {}): Plugin {
       return { code, map }
     },
 
-    async transform(source: string, filename: string) {
+    transform(source: string, filename: string) {
       if (isVue(filename)) {
         // Create deep copy to prevent issue during watching changes.
         const descriptor: SFCDescriptor = JSON.parse(
@@ -382,26 +381,20 @@ export default function vue(opts: Partial<VuePluginOptions> = {}): Plugin {
           scopeId: hasScopedStyles ? scopeId : undefined
         })
 
-        const styles = await Promise.all(
-          descriptor.styles.map(async style => {
-            if (style.content) {
-              style.content = prependStyle(
-                filename,
-                style.lang || 'css',
-                style.content,
-                style.map
-              ).code
-            }
-
-            const compiled = await compiler.compileStyleAsync(
+        const styles = descriptor.styles.map(style => {
+          if (style.content) {
+            style.content = prependStyle(
               filename,
-              scopeId,
-              style
-            )
-            if (compiled.errors.length > 0) throw Error(compiled.errors[0])
-            return compiled
-          })
-        )
+              style.lang || 'css',
+              style.content,
+              style.map
+            ).code
+          }
+
+          const compiled = compiler.compileStyle(filename, scopeId, style)
+          if (compiled.errors.length > 0) throw Error(compiled.errors[0])
+          return compiled
+        })
 
         const input: any = {
           scopeId,
